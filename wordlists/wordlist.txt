@@ -1,0 +1,6 @@
+const wordlist = [
+  "satoshinakamoto", "halfinney", "neverforget911", "tupacalive", "letmein123",
+  "trustno1", "password123", "qwerty", "admin1q2w3e4r", "matrixneo",
+  "cryptogod", "jesusislord", "pokemonred", "monkey000000", "hodl123"
+];
+export default wordlist;
