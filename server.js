@@ -1,46 +1,68 @@
-// backend/server.js
-
+// server.js
+require('dotenv').config();
 const express = require('express');
-const cors = require('cors');
+const fetch = require('node-fetch');
+const supabase = require('./supabaseClient'); // <- assumes you created this file
 const app = express();
 
-app.use(cors());
-const path = require('path');
+const PORT = process.env.PORT || 3000;
+const RPC_URL = process.env.SOLANA_RPC_URL || 'https://api.mainnet-beta.solana.com';
+const AUTH_HEADER = process.env.RPC_AUTH_TOKEN || '';
 
-// Serve frontend (index.html)
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '../frontend/index.html'));
+app.use(express.json());
+
+/**
+ * Health check route
+ */
+app.get('/ping', (_, res) => {
+  res.status(200).send('pong');
 });
 
-// Also serve frontend assets (JS, CSS)
-app.use(express.static(path.join(__dirname, '../frontend')));
+/**
+ * Solana RPC Proxy
+ */
+app.post('/solana/rpc', async (req, res) => {
+  try {
+    const response = await fetch(RPC_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(AUTH_HEADER && { 'Authorization': AUTH_HEADER })
+      },
+      body: JSON.stringify(req.body)
+    });
 
-
-let sniperActive = false;
-
-// Start Sniper
-app.post('/api/start-sniper', (req, res) => {
-  sniperActive = true;
-  console.log('[ACE Sniper] 🟢 Sniper Activated');
-  // You can call your sniper starter function here if needed
-  res.json({ success: true });
+    const data = await response.json();
+    res.status(response.status).json(data);
+  } catch (err) {
+    console.error('RPC Proxy Error:', err);
+    res.status(500).json({ error: 'Proxy error', details: err.message });
+  }
 });
 
-// Stop Sniper
-app.post('/api/stop-sniper', (req, res) => {
-  sniperActive = false;
-  console.log('[ACE Sniper] 🔴 Sniper Deactivated');
-  // You can stop sniper logic here if needed
-  res.json({ success: true });
+/**
+ * Example: Get recent Solana snipes from Supabase
+ */
+app.get('/snipes', async (req, res) => {
+  try {
+    const { data, error } = await supabase
+      .from('snipes')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) {
+      throw error;
+    }
+
+    res.status(200).json(data);
+  } catch (err) {
+    console.error('Supabase Fetch Error:', err);
+    res.status(500).json({ error: 'Failed to fetch snipes', details: err.message });
+  }
 });
 
-// Get Status
-app.get('/api/status', (req, res) => {
-  res.json({ sniperActive });
-});
-
-// Start Express server
-const PORT = 3000;
+// Local dev (Vercel ignores this)
 app.listen(PORT, () => {
-  console.log(`[ACE Sniper] Backend API listening at http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });
